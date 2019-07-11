@@ -18,20 +18,30 @@ const JAMO_START: u32 = 0x3130;
 
 const SYLLABLE_START: u32 = 0xAC00; // 가
 const SYLLABLE_END: u32 = 0xD7A3; // 힣
-/// Utilities to handle [Hangul Syllables][syllables].
+
+/// Utilities to handle the [Hangul syllables][syllables].
 ///
 /// This trait extends [`char`][char] with methods including:
 ///
-/// - _Predicate_ that checks whether given [`char`][char] is a [Hangul Syllable][syllables]
-/// - _Getters_ for Choseong, Jungseong, Jongseong, Jamo, and Jamos Iterator
+/// - _Predicate_ checks whether given [`char`][char] is a [Hangul syllable][syllables]
+/// - _Predicate_ indicates whether the syllable has a jongseong — in other words, closed
+/// - _Getters_ for choseong, jungseong, jongseong, and jamo
+/// - _Iterator_ iterates over jamos consisting a syllable
 ///
-/// To use these methods, import the [`HangulExt`](trait.HangulExt.html) crate:
+/// To use these methods, add this to your `Cargo.toml`:
+///
+/// ```toml
+/// [dependencies]
+/// hangul = "0.1.1"
+/// ```
+///
+/// then import [`HangulExt`](trait.HangulExt.html) trait:
 ///
 /// ```
 /// use hangul::HangulExt;
 /// ```
 ///
-/// Now you can use the methods:
+/// Now you can use the methods.
 ///
 /// ```
 /// use hangul::HangulExt;
@@ -43,6 +53,8 @@ const SYLLABLE_END: u32 = 0xD7A3; // 힣
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 pub trait HangulExt {
   fn is_syllable(self) -> bool;
+  fn is_open(self) -> Result<bool, ParseSyllableError>;
+  fn is_closed(self) -> Result<bool, ParseSyllableError>;
   fn choseong(self) -> Result<char, ParseSyllableError>;
   fn jungseong(self) -> Result<char, ParseSyllableError>;
   fn jongseong(self) -> Result<Option<char>, ParseSyllableError>;
@@ -50,16 +62,16 @@ pub trait HangulExt {
   fn jamos(self) -> Result<Jamos, ParseSyllableError>;
 }
 
-/// An error which can be returned when a given [`char`][char] is not in a [Hangul Syllables][syllables].
+/// An error which can be returned when a given [`char`][char] is not in a [Hangul syllables][syllables].
 ///
 /// Unicode Hangul Syllables is a Unicode block range from `U+AC00` to `U+D7AF`. Since [`char`][char] covers much larger range,
-/// there's a chance where char is not in a Hangul Syllable. In that case, [`ParseSyllableError`](struct.ParseSyllableError.html) is returned.
+/// there's a chance where char is not in a Hangul syllable. In that case, [`ParseSyllableError`](struct.ParseSyllableError.html) is returned.
 /// [syllables]: https://en.wikipedia.org/wiki/Hangul_Syllables
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ParseSyllableError;
 
-/// An iterator over the [Jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) [`char`][char]s of a [Syllable](https://en.wikipedia.org/wiki/Hangul_Syllables).
+/// An iterator over the [jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) [`char`][char]s of the [syllable](https://en.wikipedia.org/wiki/Hangul_Syllables).
 ///
 /// This struct is created by the [`jamos`](trait.HangulExt.html#method.jamos) method on [`char`][char] extended with [`HangulExt`] trait. See its documentation for more.
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
@@ -77,7 +89,7 @@ impl Iterator for Jamos {
 }
 
 impl HangulExt for char {
-  /// Tests whether the [`char`][char] is a [Hangul Syllable](https://en.wikipedia.org/wiki/Hangul_Syllables).
+  /// Tests whether the [`char`][char] is a [Hangul syllable](https://en.wikipedia.org/wiki/Hangul_Syllables).
   ///
   /// # Example
   ///
@@ -85,7 +97,7 @@ impl HangulExt for char {
   /// use hangul::HangulExt;
   ///
   /// assert_eq!('냐'.is_syllable(), true);
-  /// assert_eq!('猫'.is_syllable(), false);
+  /// assert_eq!('猫'.is_syllable(), false); // 猫 is a Chinese character
   /// ```
   /// [char]: https://doc.rust-lang.org/std/primitive.char.html
   fn is_syllable(self) -> bool {
@@ -93,11 +105,59 @@ impl HangulExt for char {
     cp >= SYLLABLE_START && cp <= SYLLABLE_END
   }
 
-  /// Returns [Compatibility Jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) Choseong of a given [`char`](https://doc.rust-lang.org/std/primitive.char.html)
+  /// Tests whether [`char`](https://doc.rust-lang.org/std/primitive.char.html) is an [open](https://en.wikipedia.org/wiki/Syllable#Open_and_closed) syllable, i.e., doesn't have jongseong.
   ///
   /// # Errors
   ///
-  /// If it's not a Syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html).
+  /// If it's not a syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html).
+  ///
+  /// ```
+  /// use hangul::{HangulExt, ParseSyllableError};
+  ///
+  /// assert_eq!('Ж'.is_open(), Err(ParseSyllableError));
+  /// ```
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use hangul::HangulExt;
+  ///
+  /// assert_eq!('해'.is_open().unwrap(), true); // 해 is open because it doesn't have any jongseong.
+  /// assert_eq!('달'.is_open().unwrap(), false); // 달 is open because it has a jongseong ㄹ.
+  /// ```
+  fn is_open(self) -> Result<bool, ParseSyllableError> {
+    self.jongseong().map(|j| j.is_none())
+  }
+
+  /// Tests whether [`char`](https://doc.rust-lang.org/std/primitive.char.html) is a [closed](https://en.wikipedia.org/wiki/Syllable#Open_and_closed) syllable, i.e., has jongseong.
+  ///
+  /// # Errors
+  ///
+  /// If it's not a syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html).
+  ///
+  /// ```
+  /// use hangul::{HangulExt, ParseSyllableError};
+  ///
+  /// assert_eq!('א'.is_closed(), Err(ParseSyllableError));
+  /// ```
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use hangul::HangulExt;
+  ///
+  /// assert_eq!('물'.is_closed().unwrap(), true); // 물 is closed because it has a jongseong ㄹ.
+  /// assert_eq!('무'.is_closed().unwrap(), false); // 무 is open because it doesn't have any jongseong.
+  /// ```
+  fn is_closed(self) -> Result<bool, ParseSyllableError> {
+    self.jongseong().map(|j| j.is_some())
+  }
+
+  /// Returns [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) choseong of a given [`char`](https://doc.rust-lang.org/std/primitive.char.html).
+  ///
+  /// # Errors
+  ///
+  /// If it's not a syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html).
   ///
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
@@ -106,14 +166,15 @@ impl HangulExt for char {
   /// ```
   ///
   /// # Examples
+  ///
   /// ```
   /// use hangul::HangulExt;
   ///
   /// assert_eq!('항'.choseong().unwrap(), 'ㅎ');
   /// ```
   ///
-  /// Note that [Compatibility Jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) is different from [Jamo](https://en.wikipedia.org/wiki/Hangul_Jamo_(Unicode_block)).
-  /// This crate only deals with the [Compatibility Jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo).
+  /// Note that [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) is different from [jamo](https://en.wikipedia.org/wiki/Hangul_Jamo_(Unicode_block)).
+  /// This crate only deals with the [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo).
   /// ```
   /// use hangul::HangulExt;
   ///
@@ -121,7 +182,7 @@ impl HangulExt for char {
   /// let p = 'ᄑ';
   /// assert_eq!(p as u32, 0x1111);
   ///
-  /// // Compatibility Jamo
+  /// // Compatibility jamo
   /// let p_compat = '푸'.choseong().unwrap();
   /// assert_eq!(p_compat, 'ㅍ');
   /// assert_eq!(p_compat as u32, 0x314D);
@@ -137,7 +198,43 @@ impl HangulExt for char {
     }
   }
 
-  /// Returns [Compatibility Jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) Jungseong of a given [`char`](https://doc.rust-lang.org/std/primitive.char.html)
+  /// Returns [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) jungseong of a given [`char`](https://doc.rust-lang.org/std/primitive.char.html).
+  ///
+  /// # Errors
+  ///
+  /// If it's not a syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html).
+  ///
+  /// ```
+  /// use hangul::{HangulExt, ParseSyllableError};
+  ///
+  /// assert_eq!('L'.jungseong(), Err(ParseSyllableError));
+  /// ```
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hangul::HangulExt;
+  ///
+  /// assert_eq!('괴'.jungseong().unwrap(), 'ㅚ');
+  /// ```
+  ///
+  /// Note that [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) is different from [jamo](https://en.wikipedia.org/wiki/Hangul_Jamo_(Unicode_block)).
+  /// This crate only deals with the [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo).
+  ///
+  /// ```
+  /// use hangul::HangulExt;
+  ///
+  /// // Jamo
+  /// let u = 'ᅲ';
+  /// assert_eq!(u as u32, 0x1172);
+  ///
+  /// // Compatibility jamo
+  /// let u_compat = '퓨'.jungseong().unwrap();
+  /// assert_eq!(u_compat, 'ㅠ');
+  /// assert_eq!(u_compat as u32, 0x3160);
+  ///
+  /// assert_ne!(u_compat, u);
+  /// ```
   fn jungseong(self) -> Result<char, ParseSyllableError> {
     if self.is_syllable() {
       let jungseong_offset = (offset(self) / JONGSEONG_COUNT % JUNGSEONG_COUNT) as u32;
@@ -147,7 +244,44 @@ impl HangulExt for char {
     }
   }
 
-  /// Returns [`Option`](https://doc.rust-lang.org/stable/std/option/) of a [Compatibility Jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) Jongseong of a given [`char`](https://doc.rust-lang.org/std/primitive.char.html)
+  /// Returns [`Option`](https://doc.rust-lang.org/stable/std/option/) of a [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) jongseong of a given [`char`](https://doc.rust-lang.org/std/primitive.char.html).
+  ///
+  /// # Errors
+  ///
+  /// If it's not a syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html).
+  ///
+  /// ```
+  /// use hangul::{HangulExt, ParseSyllableError};
+  ///
+  /// assert_eq!('か'.jongseong(), Err(ParseSyllableError)); // か is a katakana
+  /// ```
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hangul::HangulExt;
+  ///
+  /// assert_eq!('말'.jongseong().unwrap(), Some('ㄹ'));
+  /// assert_eq!('소'.jongseong().unwrap(), None);
+  /// ```
+  ///
+  /// Note that [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) is different from [jamo](https://en.wikipedia.org/wiki/Hangul_Jamo_(Unicode_block)).
+  /// This crate only deals with the [compatibility jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo).
+  ///
+  /// ```
+  /// use hangul::HangulExt;
+  ///
+  /// // Jamo
+  /// let rg = 'ᆰ';
+  /// assert_eq!(rg as u32, 0x11B0);
+  ///
+  /// // Compatibility jamo
+  /// let rg_compat = '닭'.jongseong().unwrap().unwrap();
+  /// assert_eq!(rg_compat, 'ㄺ');
+  /// assert_eq!(rg_compat as u32, 0x313A);
+  ///
+  /// assert_ne!(rg_compat, rg);
+  /// ```
   fn jongseong(self) -> Result<Option<char>, ParseSyllableError> {
     if self.is_syllable() {
       let jongseong_offset = (offset(self) % JONGSEONG_COUNT) as usize;
@@ -168,8 +302,8 @@ impl HangulExt for char {
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
   ///
-  /// assert_eq!('정'.to_jamo(), Ok(('ㅈ', 'ㅓ', Some('ㅇ'))));
-  /// assert_eq!('유'.to_jamo(), Ok(('ㅇ', 'ㅠ', None)));
+  /// assert_eq!('결'.to_jamo(), Ok(('ㄱ', 'ㅕ', Some('ㄹ'))));
+  /// assert_eq!('씨'.to_jamo(), Ok(('ㅆ', 'ㅣ', None)));
   /// assert_eq!('a'.to_jamo(), Err(ParseSyllableError));
   /// ```
   ///
@@ -189,7 +323,7 @@ impl HangulExt for char {
   ///
   /// # Errors
   ///
-  /// If given [`char`](https://doc.rust-lang.org/std/primitive.char.html) is not a Syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html)
+  /// If given [`char`](https://doc.rust-lang.org/std/primitive.char.html) is not a syllable, returns [`ParseSyllableError`](struct.ParseSyllableError.html).
   ///
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
@@ -214,17 +348,28 @@ impl HangulExt for char {
   ///
   /// ```
   ///
-  /// You can use it with [`flat_map`](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.flat_map) to decompose Hangul String
+  /// You can use it with [`iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html) methods like [`flat_map`](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.flat_map) or [`fold`](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.fold) to decompose Hangul String.
   ///
   /// ```
   /// use hangul::{HangulExt};
   ///
   /// assert_eq!(
-  ///   "신경쓰지마"
+  ///   "첫사랑"
   ///     .chars()
   ///     .flat_map(|c| c.jamos().unwrap())
   ///     .collect::<String>(),
-  ///   "ㅅㅣㄴㄱㅕㅇㅆㅡㅈㅣㅁㅏ"
+  ///   "ㅊㅓㅅㅅㅏㄹㅏㅇ"
+  /// );
+  ///
+  /// assert_eq!(
+  ///   "첫사랑은 두 번 다시 겪을 수 없다."
+  ///     .chars()
+  ///     .fold("".to_owned(), |acc, c| acc
+  ///       + &c
+  ///         .jamos()
+  ///         .map(|j| j.collect::<String>())
+  ///         .unwrap_or(c.to_string())),
+  ///   "ㅊㅓㅅㅅㅏㄹㅏㅇㅇㅡㄴ ㄷㅜ ㅂㅓㄴ ㄷㅏㅅㅣ ㄱㅕㄲㅇㅡㄹ ㅅㅜ ㅇㅓㅄㄷㅏ."
   /// );
   /// ```
   fn jamos(self) -> Result<Jamos, ParseSyllableError> {
