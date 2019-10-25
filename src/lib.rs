@@ -3,7 +3,7 @@
 //! [HangulExt](trait.HangulExt.html) trait extends [`char`][char] with following methods:
 //!
 //! - _Predicate_ checks whether given [`char`][char] is a [Hangul syllable][syllables]
-//! - _Predicate_ indicates whether the syllable has a jongseong — in other words, closed
+//! - _Predicate_ indicates whether the syllable has a jongseong — in other words, [closed]
 //! - _Getters_ for choseong, jungseong, jongseong, and jamo
 //! - _Iterator_ iterates over jamos consisting a syllable
 //!
@@ -11,7 +11,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! hangul = "0.1.1"
+//! hangul = "0.1.2"
 //! ```
 //!
 //! then import [`HangulExt`](trait.HangulExt.html) trait:
@@ -31,6 +31,10 @@
 //!
 //! [syllables]: https://en.wikipedia.org/wiki/Hangul_Syllables
 //! [char]: https://doc.rust-lang.org/std/primitive.char.html
+//! [closed]: https://en.wikipedia.org/wiki/Syllable#Open_and_closed
+
+use std::error::Error;
+use std::fmt;
 
 const CHOSEONG_TO_JAMO: [u32; 19] = [
   1, 2, 4, 7, 8, 9, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
@@ -54,7 +58,7 @@ const SYLLABLE_START: u32 = 0xAC00; // 가
 const SYLLABLE_END: u32 = 0xD7A3; // 힣
 
 /// [Extension trait] to define additional methods on primitive type [`char`][char].
-/// 
+///
 /// [Extension trait]: https://github.com/rust-lang/rfcs/blob/master/text/0445-extension-trait-conventions.md
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 pub trait HangulExt {
@@ -76,11 +80,19 @@ pub trait HangulExt {
 /// [syllables]: https://en.wikipedia.org/wiki/Hangul_Syllables
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct ParseSyllableError;
+pub struct ParseSyllableError(char);
+
+impl fmt::Display for ParseSyllableError {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{} is not a Hangul Syllable", self.0)
+  }
+}
+
+impl Error for ParseSyllableError {}
 
 /// Iterator over the [jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) [`char`][char]s of the [syllable](https://en.wikipedia.org/wiki/Hangul_Syllables).
 ///
-/// This struct is created by the [`jamos`](trait.HangulExt.html#method.jamos) method on [`char`][char] extended with [`HangulExt`] trait. See its documentation for more.
+/// This struct is created by the [`jamos`](trait.HangulExt.html#method.jamos) method on [`char`][char] extended with [`HangulExt`](trait.HangulExt.html) trait. See its documentation for more.
 ///
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -123,7 +135,7 @@ impl HangulExt for char {
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
   ///
-  /// assert_eq!('Ж'.is_open(), Err(ParseSyllableError));
+  /// assert!('Ж'.is_open().is_err(), "`Ж` is not a Hangul Syllable"); // Ж is a Cyrillic alphabet
   /// ```
   ///
   /// # Example
@@ -147,7 +159,7 @@ impl HangulExt for char {
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
   ///
-  /// assert_eq!('א'.is_closed(), Err(ParseSyllableError));
+  /// assert!('א'.is_closed().is_err(), "`א` is not a Hangul Syllable"); // א is a Hebrew alphabet
   /// ```
   ///
   /// # Example
@@ -171,7 +183,7 @@ impl HangulExt for char {
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
   ///
-  /// assert_eq!('🥑'.choseong(), Err(ParseSyllableError));
+  /// assert!('🥑'.choseong().is_err(), "`🥑` is not a Hangul Syllable");
   /// ```
   ///
   /// # Examples
@@ -203,7 +215,7 @@ impl HangulExt for char {
       let choseong_offset = (offset(self) / JONGSEONG_COUNT / JUNGSEONG_COUNT) as usize;
       Ok(std::char::from_u32(JAMO_START + CHOSEONG_TO_JAMO[choseong_offset]).unwrap())
     } else {
-      Err(ParseSyllableError)
+      Err(ParseSyllableError(self))
     }
   }
 
@@ -216,7 +228,7 @@ impl HangulExt for char {
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
   ///
-  /// assert_eq!('L'.jungseong(), Err(ParseSyllableError));
+  /// assert!('L'.jungseong().is_err(), "`L` is not a Hangul Syllable");
   /// ```
   ///
   /// # Examples
@@ -249,7 +261,7 @@ impl HangulExt for char {
       let jungseong_offset = (offset(self) / JONGSEONG_COUNT % JUNGSEONG_COUNT) as u32;
       Ok(std::char::from_u32(JAMO_START + jungseong_offset + 31).unwrap())
     } else {
-      Err(ParseSyllableError)
+      Err(ParseSyllableError(self))
     }
   }
 
@@ -262,7 +274,7 @@ impl HangulExt for char {
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
   ///
-  /// assert_eq!('か'.jongseong(), Err(ParseSyllableError)); // か is a katakana
+  /// assert!('か'.jongseong().is_err(), "`か` is not a Hangul Syllable"); // か is a katakana
   /// ```
   ///
   /// # Examples
@@ -302,7 +314,7 @@ impl HangulExt for char {
         Ok(None)
       }
     } else {
-      Err(ParseSyllableError)
+      Err(ParseSyllableError(self))
     }
   }
 
@@ -313,7 +325,7 @@ impl HangulExt for char {
   ///
   /// assert_eq!('결'.to_jamo(), Ok(('ㄱ', 'ㅕ', Some('ㄹ'))));
   /// assert_eq!('씨'.to_jamo(), Ok(('ㅆ', 'ㅣ', None)));
-  /// assert_eq!('a'.to_jamo(), Err(ParseSyllableError));
+  /// assert!('a'.to_jamo().is_err(), "`a` is not a Hangul Syllable");
   /// ```
   fn to_jamo(self) -> Result<(char, char, Option<char>), ParseSyllableError> {
     if self.is_syllable() {
@@ -323,7 +335,7 @@ impl HangulExt for char {
         self.jongseong().unwrap(),
       ))
     } else {
-      Err(ParseSyllableError)
+      Err(ParseSyllableError(self))
     }
   }
 
@@ -336,7 +348,7 @@ impl HangulExt for char {
   /// ```
   /// use hangul::{HangulExt, ParseSyllableError};
   ///
-  /// assert_eq!('K'.jamos(), Err(ParseSyllableError));
+  /// assert!('K'.jamos().is_err(), "`K` is not a Hangul Syllable");
   /// ```
   ///
   /// # Examples
@@ -391,7 +403,7 @@ impl HangulExt for char {
 
       Ok(jamos)
     } else {
-      Err(ParseSyllableError)
+      Err(ParseSyllableError(self))
     }
   }
 }
