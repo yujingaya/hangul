@@ -2,11 +2,17 @@
 name = "hangul"
 version = "0.1.1"
 authors = ["YujinGaya <yujin.gaya@gmail.com>"]
+
 edition = "2018"
+
 description = "Utilities to manipulate Hangul Syllables"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/YujinGaya/hangul"
+license = "MIT"
 keywords = ["hangul", "char"]
 categories = ["encoding", "localization", "text-processing", "value-formatting"]
+
+repository = "https://github.com/YujinGaya/hangul"
+documentation = "https://docs.rs/hangul"
+
+readme = "README.md"
 
 [dependencies]

@@ -1,3 +1,37 @@
+//! Utilities to manipulate [Hangul syllables][syllables].
+//!
+//! [HangulExt](trait.HangulExt.html) trait extends [`char`][char] with following methods:
+//!
+//! - _Predicate_ checks whether given [`char`][char] is a [Hangul syllable][syllables]
+//! - _Predicate_ indicates whether the syllable has a jongseong — in other words, closed
+//! - _Getters_ for choseong, jungseong, jongseong, and jamo
+//! - _Iterator_ iterates over jamos consisting a syllable
+//!
+//! To use these methods, add this to your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! hangul = "0.1.1"
+//! ```
+//!
+//! then import [`HangulExt`](trait.HangulExt.html) trait:
+//!
+//! ```
+//! use hangul::HangulExt;
+//! ```
+//!
+//! Now you can use the methods.
+//!
+//! ```
+//! use hangul::HangulExt;
+//!
+//! assert_eq!('京'.is_syllable(), false);
+//! assert_eq!('설'.to_jamo(), Ok(( 'ㅅ', 'ㅓ', Some('ㄹ'))));
+//! ```
+//!
+//! [syllables]: https://en.wikipedia.org/wiki/Hangul_Syllables
+//! [char]: https://doc.rust-lang.org/std/primitive.char.html
+
 const CHOSEONG_TO_JAMO: [u32; 19] = [
   1, 2, 4, 7, 8, 9, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
 ];
@@ -19,37 +53,9 @@ const JAMO_START: u32 = 0x3130;
 const SYLLABLE_START: u32 = 0xAC00; // 가
 const SYLLABLE_END: u32 = 0xD7A3; // 힣
 
-/// Utilities to handle the [Hangul syllables][syllables].
-///
-/// This trait extends [`char`][char] with methods including:
-///
-/// - _Predicate_ checks whether given [`char`][char] is a [Hangul syllable][syllables]
-/// - _Predicate_ indicates whether the syllable has a jongseong — in other words, closed
-/// - _Getters_ for choseong, jungseong, jongseong, and jamo
-/// - _Iterator_ iterates over jamos consisting a syllable
-///
-/// To use these methods, add this to your `Cargo.toml`:
-///
-/// ```toml
-/// [dependencies]
-/// hangul = "0.1.1"
-/// ```
-///
-/// then import [`HangulExt`](trait.HangulExt.html) trait:
-///
-/// ```
-/// use hangul::HangulExt;
-/// ```
-///
-/// Now you can use the methods.
-///
-/// ```
-/// use hangul::HangulExt;
-///
-/// assert_eq!('京'.is_syllable(), false);
-/// assert_eq!('설'.to_jamo(), Ok(( 'ㅅ', 'ㅓ', Some('ㄹ'))));
-/// ```
-/// [syllables]: https://en.wikipedia.org/wiki/Hangul_Syllables
+/// [Extension trait] to define additional methods on primitive type [`char`][char].
+/// 
+/// [Extension trait]: https://github.com/rust-lang/rfcs/blob/master/text/0445-extension-trait-conventions.md
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 pub trait HangulExt {
   fn is_syllable(self) -> bool;
@@ -62,18 +68,20 @@ pub trait HangulExt {
   fn jamos(self) -> Result<Jamos, ParseSyllableError>;
 }
 
-/// An error which can be returned when a given [`char`][char] is not in a [Hangul syllables][syllables].
+/// Error which can be returned when a given [`char`][char] is not in a [Hangul syllables][syllables].
 ///
 /// Unicode Hangul Syllables is a Unicode block range from `U+AC00` to `U+D7AF`. Since [`char`][char] covers much larger range,
 /// there's a chance where char is not in a Hangul syllable. In that case, [`ParseSyllableError`](struct.ParseSyllableError.html) is returned.
+///
 /// [syllables]: https://en.wikipedia.org/wiki/Hangul_Syllables
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ParseSyllableError;
 
-/// An iterator over the [jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) [`char`][char]s of the [syllable](https://en.wikipedia.org/wiki/Hangul_Syllables).
+/// Iterator over the [jamo](https://en.wikipedia.org/wiki/Hangul_Compatibility_Jamo) [`char`][char]s of the [syllable](https://en.wikipedia.org/wiki/Hangul_Syllables).
 ///
 /// This struct is created by the [`jamos`](trait.HangulExt.html#method.jamos) method on [`char`][char] extended with [`HangulExt`] trait. See its documentation for more.
+///
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Jamos {
@@ -99,6 +107,7 @@ impl HangulExt for char {
   /// assert_eq!('냐'.is_syllable(), true);
   /// assert_eq!('猫'.is_syllable(), false); // 猫 is a Chinese character
   /// ```
+  ///
   /// [char]: https://doc.rust-lang.org/std/primitive.char.html
   fn is_syllable(self) -> bool {
     let cp = self as u32; // cp stands for (Unicode) code point
@@ -306,7 +315,6 @@ impl HangulExt for char {
   /// assert_eq!('씨'.to_jamo(), Ok(('ㅆ', 'ㅣ', None)));
   /// assert_eq!('a'.to_jamo(), Err(ParseSyllableError));
   /// ```
-  ///
   fn to_jamo(self) -> Result<(char, char, Option<char>), ParseSyllableError> {
     if self.is_syllable() {
       Ok((
