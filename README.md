@@ -21,7 +21,7 @@ Add `hangul` as a dependency in your `Cargo.toml`.
 
 ```toml
 [dependencies]
-hangul = "0.1.2"
+hangul = "0.1.3"
 ```
 
 then import [`HangulExt`](trait.HangulExt.html) trait in your code:

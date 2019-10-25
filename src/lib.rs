@@ -11,7 +11,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! hangul = "0.1.2"
+//! hangul = "0.1.3"
 //! ```
 //!
 //! then import [`HangulExt`](trait.HangulExt.html) trait:
@@ -80,7 +80,7 @@ pub trait HangulExt {
 /// [syllables]: https://en.wikipedia.org/wiki/Hangul_Syllables
 /// [char]: https://doc.rust-lang.org/std/primitive.char.html
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct ParseSyllableError(char);
+pub struct ParseSyllableError(pub char);
 
 impl fmt::Display for ParseSyllableError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
